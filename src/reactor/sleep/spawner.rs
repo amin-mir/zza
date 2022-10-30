@@ -18,7 +18,7 @@ impl Spawner {
     }
 
     pub fn spawn(&self, until: Instant, waker: Waker) {
-        let sleep = Sleep { until, waker };
+        let sleep = Sleep::new(until, waker);
         self.sleep_tx.send(sleep).unwrap();
     }
 }
@@ -36,7 +36,7 @@ mod tests {
     fn spawn_constructs_correct_sleep() {
         let (tx, rx) = channel::unbounded();
 
-        let waker: Waker = TestWaker.into();
+        let waker: Waker = TestWaker::new().waker();
         let until = Instant::now() + Duration::from_millis(200);
 
         let spawner = Spawner::new(tx);
