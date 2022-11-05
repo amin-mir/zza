@@ -16,6 +16,11 @@ use scheduler::Scheduler;
 mod waiter;
 use waiter::Waiter;
 
+// TODO List:
+// add more tests for scheduler.
+// integrate tracing.
+// update sleep future to use the new reactor.
+
 pub fn run() -> Spawner {
     // `Sleeper` thread that sleeps
     // `Scheduler` thread that schedules new sleeps and signals `Sleeper`

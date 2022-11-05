@@ -13,7 +13,6 @@
 //! 5 - Futures explained in 200 lines book
 
 // Steps:
-// 0. finish the last three tabs.
 // 1. implement a SleepReactor that handles many SleepFutures
 //    with a single thread. Basically the future will submit its
 //    request (waker + duration) to the reactor instead of own thread.
