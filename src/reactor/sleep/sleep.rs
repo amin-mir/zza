@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::fmt::{Display, Formatter, self};
+use std::fmt::{self, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::Waker;
@@ -23,7 +23,12 @@ pub struct Sleep {
 impl Display for Sleep {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let dur = self.until.duration_since(Instant::now());
-        write!(f, "Sleep {{id = {}, duration = {} }}", self.id, dur.as_millis())
+        write!(
+            f,
+            "Sleep {{id = {}, remaining_duration = {} }}",
+            self.id,
+            dur.as_millis()
+        )
     }
 }
 
@@ -97,7 +102,7 @@ mod tests {
             Sleep::new(now + Duration::from_millis(200), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(now + Duration::from_millis(300), WAKER.clone()),);
+        let i = sleeps.add(Sleep::new(now + Duration::from_millis(300), WAKER.clone()));
         assert_eq!(i, 2);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -125,7 +130,7 @@ mod tests {
             Sleep::new(now + Duration::from_millis(300), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(now + Duration::from_millis(100), WAKER.clone()),);
+        let i = sleeps.add(Sleep::new(now + Duration::from_millis(100), WAKER.clone()));
         assert_eq!(i, 0);
         assert_eq!(sleeps.0.len(), 3);
     }

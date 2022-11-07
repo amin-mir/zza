@@ -17,9 +17,8 @@ mod waiter;
 use waiter::Waiter;
 
 // TODO List:
-// add more tests for scheduler.
-// integrate tracing.
 // update sleep future to use the new reactor.
+// take it easy and document tracing learnings.
 
 pub fn run() -> Spawner {
     // `Sleeper` thread that sleeps
@@ -54,7 +53,7 @@ mod tests {
     use std::time::Duration;
     use std::time::Instant;
 
-    use crossbeam::channel::{self, Sender, Receiver};
+    use crossbeam::channel::{self, Receiver, Sender};
 
     use super::*;
 

@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossbeam::channel::Receiver;
+use tracing::debug;
 
 use super::{Sleep, Sleeps};
 
@@ -32,13 +33,13 @@ impl<U: Unparker> Scheduler<U> {
     pub fn run(&mut self) {
         // IDEA: can we read in batch so we do the locking one time only???
         while let Ok(sleep) = self.sleep_rx.recv() {
-            println!("[Scheduler] going to acquire lock to send sleep to waiter.");
+            debug!("going to acquire lock to send sleep to waiter.");
             let mut sleeps = self.sleeps.lock().unwrap();
             let i = sleeps.add(sleep);
             // Handle the case where there's an earlier time we should wake up
             // from sleep.
             if i == 0 {
-                println!("[Scheduler] received an earlier sleep, going to unpark.");
+                debug!("received an earlier sleep, going to unpark.");
                 self.unparker.unpark();
             }
         }
@@ -50,10 +51,12 @@ mod tests {
     use super::*;
 
     use crossbeam::channel::RecvTimeoutError;
+    use tracing::{trace_span, trace};
     use std::thread;
-    use std::time::{Instant, Duration};
+    use std::time::{Duration, Instant};
 
     use crossbeam::channel::{self, Sender};
+    use test_log::test;
 
     use crate::reactor::sleep::tests::TestWaker;
 
@@ -72,7 +75,7 @@ mod tests {
         fn new() -> Self {
             let (called_tx, called_rx) = channel::unbounded();
             Self {
-                state: Arc::new(Mutex::new(MockUnparkerInner{called: 0})),
+                state: Arc::new(Mutex::new(MockUnparkerInner { called: 0 })),
                 called_tx,
                 called_rx,
             }
@@ -81,7 +84,9 @@ mod tests {
         fn not_called(&self) -> Result<(), String> {
             match self.called_rx.recv_timeout(Duration::from_millis(50)) {
                 Err(RecvTimeoutError::Timeout) => Ok(()),
-                Err(RecvTimeoutError::Disconnected) => Err("Unparker called_rx channel is disconnected.".to_string()),
+                Err(RecvTimeoutError::Disconnected) => {
+                    Err("Unparker called_rx channel is disconnected.".to_string())
+                }
                 _ => Err("unpark has been called.".to_string()),
             }
         }
@@ -93,10 +98,12 @@ mod tests {
         }
 
         fn wait_called(&self) {
+            let _span = trace_span!("MockUnparker.wait_called").entered();
+
+            trace!("waiting for unpark to be called.");
             let now = Instant::now();
-            println!("waiting for unpark to be called.");
             self.called_rx.recv().unwrap();
-            println!("unpark called after {}.", now.elapsed().as_millis());
+            trace!("unpark called after {}.", now.elapsed().as_millis());
         }
     }
 
@@ -130,10 +137,12 @@ mod tests {
             scheduler.run();
         });
 
-        sleep_tx.send(Sleep::new(
-            Instant::now() + Duration::from_millis(100),
-            test_waker.clone().waker(),
-        )).unwrap();
+        sleep_tx
+            .send(Sleep::new(
+                Instant::now() + Duration::from_millis(100),
+                test_waker.clone().waker(),
+            ))
+            .unwrap();
 
         // unpark should not have been called.
         unparker.not_called()
@@ -162,10 +171,12 @@ mod tests {
             scheduler.run();
         });
 
-        sleep_tx.send(Sleep::new(
-            Instant::now() + Duration::from_millis(20),
-            test_waker.clone().waker(),
-        )).unwrap();
+        sleep_tx
+            .send(Sleep::new(
+                Instant::now() + Duration::from_millis(20),
+                test_waker.clone().waker(),
+            ))
+            .unwrap();
 
         // unpark should have been called.
         assert_eq!(unparker.called(), 1);

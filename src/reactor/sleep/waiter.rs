@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crossbeam::sync::Parker;
+use tracing::{debug, debug_span, info, info_span, instrument};
 
 use super::{Sleep, Sleeps};
 
@@ -39,18 +40,19 @@ impl Waiter {
             if unfinished_sleep.is_some() {
                 let sleep = unfinished_sleep.take().unwrap();
                 let i = sleeps.add(sleep);
-                println!("unfinished sleep added at idx = {i}");
+                debug!(index = i, "unfinished sleep re-added.");
             }
 
             let now = Instant::now();
-            println!("{}", *sleeps);
+            debug!(sleeps = %*sleeps, "waiter's current sleeps");
+
             match sleeps.pop_front() {
                 // Park the thread indefinitely when there are no sleeps to handle.
                 None => {
                     // Release the lock otherwise there would be a deadlock.
                     drop(sleeps);
 
-                    println!("going to park indefinitely because empty sleep list.");
+                    debug!("going to park indefinitely because empty sleep list.");
                     self.parker.park();
                 }
                 Some(sleep) => {
@@ -59,7 +61,7 @@ impl Waiter {
 
                     // `park_deadline` handles the case that `Instant::now() > sleep.until`
                     // so we don't need to manually check for that.
-                    println!("going to park until {:?}.", sleep.until);
+                    debug!(until = ?sleep.until, "waiter loop is going to park until sleep due time");
                     self.parker.park_deadline(sleep.until);
 
                     // But it's possible that we wake up while this deadline hasn't passed.
@@ -67,7 +69,10 @@ impl Waiter {
                     if Instant::now() < sleep.until {
                         unfinished_sleep = Some(sleep);
                     } else {
-                        println!("waking up the waker, took = {:?}ms.", now.elapsed().as_millis());
+                        debug!(
+                            sleep_duration_ms = now.elapsed().as_millis(),
+                            "waking up the waker"
+                        );
                         sleep.waker.wake();
                     }
                 }
@@ -82,7 +87,9 @@ mod tests {
 
     use std::thread;
     use std::time::Duration;
-    
+
+    use test_log::test;
+
     use crate::reactor::sleep::tests::TestWaker;
 
     #[test]

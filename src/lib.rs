@@ -221,5 +221,3 @@ impl Future for SleepFuture {
         Poll::Pending
     }
 }
-
-struct SleepReactor {}
