@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
 use futures::future;
-
 use tracing::info;
+
 use zza::{sleep, Executor};
 
 fn main() {
