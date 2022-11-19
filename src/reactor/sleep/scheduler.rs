@@ -127,6 +127,7 @@ mod tests {
         {
             let mut sleeps = sleeps.lock().unwrap();
             sleeps.add(Sleep::new(
+                0,
                 Instant::now() + Duration::from_millis(50),
                 test_waker.clone().waker(),
             ));
@@ -139,6 +140,7 @@ mod tests {
 
         sleep_tx
             .send(Sleep::new(
+                1,
                 Instant::now() + Duration::from_millis(100),
                 test_waker.clone().waker(),
             ))
@@ -161,6 +163,7 @@ mod tests {
             // lock is released at the end of block.
             let mut sleeps = sleeps.lock().unwrap();
             sleeps.add(Sleep::new(
+                0,
                 Instant::now() + Duration::from_millis(50),
                 test_waker.clone().waker(),
             ));
@@ -173,6 +176,7 @@ mod tests {
 
         sleep_tx
             .send(Sleep::new(
+                1,
                 Instant::now() + Duration::from_millis(20),
                 test_waker.clone().waker(),
             ))

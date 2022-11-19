@@ -17,8 +17,8 @@ impl Spawner {
         Self { sleep_tx: tx }
     }
 
-    pub fn spawn(&self, until: Instant, waker: Waker) {
-        let sleep = Sleep::new(until, waker);
+    pub fn spawn(&self, id: usize, until: Instant, waker: Waker) {
+        let sleep = Sleep::new(id, until, waker);
         self.sleep_tx.send(sleep).unwrap();
     }
 }
@@ -40,7 +40,7 @@ mod tests {
         let until = Instant::now() + Duration::from_millis(200);
 
         let spawner = Spawner::new(tx);
-        spawner.spawn(until, waker.clone());
+        spawner.spawn(0, until, waker.clone());
 
         let spawned = rx.recv().unwrap();
         assert!(spawned.waker.will_wake(&waker));

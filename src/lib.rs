@@ -13,26 +13,34 @@
 //! 5 - Futures explained in 200 lines book
 
 // Steps:
-// 1. implement a SleepReactor that handles many SleepFutures
-//    with a single thread. Basically the future will submit its
-//    request (waker + duration) to the reactor instead of own thread.
-//    *** binary search + thread parking??? Then the future itself
-//    is very simple as it just checks the instant to know if it should resolve.
-// 2. enable normal program finish, so when the main future finished
+// 0. convert the raw waker into arc waker, add an id to each waker.
+//    read and review the code and fix minor issues.
+// 1. enable normal program finish, so when the main future finished
 //    the program should exit.
-// 3. enable spawning several sleeps at the same time.
+// 2. enable spawning several sleeps at the same time.
+// 3. using TLS and lazy_static! make it super easy to setup.
+// 4. figure out how to write an IO reactor.
+
 use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-use std::thread;
 use std::time::{Duration, Instant};
 
 use futures::future::BoxFuture;
+use lazy_static::lazy_static;
+use tracing::debug;
 
+// So that main can use the reactor.
 mod reactor;
+use reactor::sleep::{self, Spawner};
+
+lazy_static! {
+    static ref SLEEP_SPAWNER: Spawner = sleep::run();
+}
 
 pub fn spawn<F: Future>(f: F) {}
 
@@ -149,17 +157,31 @@ pub fn sleep(dur: Duration) -> impl Future<Output = ()> {
     SleepFuture::new(dur)
 }
 
+static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+fn sleep_id() -> usize {
+    NEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
+
 struct SleepFuture {
-    when: Instant,
-    waker: Option<Arc<Mutex<Waker>>>,
+    id: usize,
+
+    // We use when instead of dur because it is resilient against the
+    // cases where the executor is overloaded and the Future is
+    // stuck in the queue to be processed. So if the deadline is passed
+    // it will be immediately resolved.
+    until: Instant,
+
+    registered_with_reactor: bool,
 }
 
 impl SleepFuture {
     fn new(dur: Duration) -> Self {
-        let when = Instant::now() + dur;
+        let until = Instant::now() + dur;
         SleepFuture {
-            when: when,
-            waker: None,
+            id: sleep_id(),
+            until,
+            registered_with_reactor: false,
         }
     }
 }
@@ -167,55 +189,29 @@ impl SleepFuture {
 impl Future for SleepFuture {
     type Output = ();
 
-    // CONCERNS: what if poll is called for the first time and a thread is spawned.
-    // then the timeout passes but before the thread is woken up, the poll is somehow
-    // called again (??? not possible because future cannot be polled again) and
-    // the Future is resolved. But then thread wakes up and uses the
-    // waker to the task which might be assigned to another Future by then.
-    // Even if this happens, if the next future is not ready it will return pending.
-    //
-    // Solution: each time a task is driving a future it has to have a unique ID for that
-    // which is used for confirming the correct wake up.
-    // But currently tasks are dropped after they finish their work. So for each Future we
-    // create a new task. But the Future contract says that futures should not be polled
-    // after they have completed.
-    // TODO: a pool of created tasks??
-    //
-    // Why change SleepFuture to contain when instead of dur??
-    // Because as soon as an instance of it is created we calculate
-    // the time it should wake up so it is resilient against the
-    // cases where the executor is overloaded and the Future is
-    // stuck in the queue to be processed.
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let now = Instant::now();
-        let when = self.when;
+        let until = self.until;
 
-        if when < now {
+        debug!(id = self.id, ?until, ?now, "future is being polled");
+        if until <= now {
+            debug!(id = self.id, ?until, "future is resolved");
             return Poll::Ready(());
         }
 
-        if let Some(waker) = &self.waker {
-            let mut waker = waker.lock().unwrap();
-            if !waker.will_wake(cx.waker()) {
-                *waker = cx.waker().clone();
-            }
-        } else {
-            // Spawn a new waker thread.
+        if !self.registered_with_reactor {
             let waker = cx.waker().clone();
-            let waker = Arc::new(Mutex::new(waker));
-            self.waker = Some(waker.clone());
-
-            thread::spawn(move || {
-                // We should not forget to call the waker.
-                let now = Instant::now();
-
-                if now < when {
-                    thread::sleep(when - now);
-                }
-
-                let waker = waker.lock().unwrap();
-                waker.wake_by_ref();
-            });
+            self.registered_with_reactor = true;
+            SLEEP_SPAWNER.spawn(self.id, until, waker);
+        } else {
+            // TODO: how to update the waker previously registered
+            // with the reactor. This will be necessary when futures
+            // are passed between different threads.
+            //
+            // let mut waker = waker.lock().unwrap();
+            // if !waker.will_wake(cx.waker()) {
+            //     *waker = cx.waker().clone();
+            // }
         }
 
         Poll::Pending

@@ -1,15 +1,8 @@
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::Waker;
 use std::time::Instant;
-
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-
-fn sleep_id() -> usize {
-    NEXT_ID.fetch_add(1, Ordering::Relaxed)
-}
 
 // TODO: add random ID to each sleep request and implement
 // Display as it can help with debugging.
@@ -33,9 +26,9 @@ impl Display for Sleep {
 }
 
 impl Sleep {
-    pub fn new(until: Instant, waker: Waker) -> Self {
+    pub fn new(id: usize, until: Instant, waker: Waker) -> Self {
         Self {
-            id: sleep_id(),
+            id,
             until,
             waker,
         }
@@ -98,11 +91,11 @@ mod tests {
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([
-            Sleep::new(now + Duration::from_millis(100), WAKER.clone()),
-            Sleep::new(now + Duration::from_millis(200), WAKER.clone()),
+            Sleep::new(0, now + Duration::from_millis(100), WAKER.clone()),
+            Sleep::new(1, now + Duration::from_millis(200), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(now + Duration::from_millis(300), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(300), WAKER.clone()));
         assert_eq!(i, 2);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -112,11 +105,11 @@ mod tests {
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([
-            Sleep::new(now + Duration::from_millis(100), WAKER.clone()),
-            Sleep::new(now + Duration::from_millis(300), WAKER.clone()),
+            Sleep::new(0, now + Duration::from_millis(100), WAKER.clone()),
+            Sleep::new(1, now + Duration::from_millis(300), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(now + Duration::from_millis(200), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(200), WAKER.clone()));
         assert_eq!(i, 1);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -126,11 +119,11 @@ mod tests {
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([
-            Sleep::new(now + Duration::from_millis(200), WAKER.clone()),
-            Sleep::new(now + Duration::from_millis(300), WAKER.clone()),
+            Sleep::new(0, now + Duration::from_millis(200), WAKER.clone()),
+            Sleep::new(1, now + Duration::from_millis(300), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(now + Duration::from_millis(100), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(100), WAKER.clone()));
         assert_eq!(i, 0);
         assert_eq!(sleeps.0.len(), 3);
     }

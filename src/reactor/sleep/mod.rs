@@ -8,7 +8,7 @@ mod sleep;
 use sleep::{Sleep, Sleeps};
 
 mod spawner;
-use spawner::Spawner;
+pub use spawner::Spawner;
 
 mod scheduler;
 use scheduler::Scheduler;
@@ -50,8 +50,6 @@ pub fn run() -> Spawner {
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::task::{Wake, Waker};
-    use std::time::Duration;
-    use std::time::Instant;
 
     use crossbeam::channel::{self, Receiver, Sender};
 
@@ -92,20 +90,5 @@ mod tests {
             self.woken.store(true, Ordering::Relaxed);
             self.wake_tx.send(()).unwrap();
         }
-    }
-
-    #[test]
-    fn test_spawn() {
-        let spawner = run();
-
-        let test_waker = TestWaker::new();
-        let waker: Waker = test_waker.waker();
-        let until = Instant::now() + Duration::from_millis(100);
-        spawner.spawn(until, waker.clone());
-
-        let until = Instant::now() + Duration::from_millis(50);
-        spawner.spawn(until, waker);
-
-        thread::sleep(Duration::from_secs(1));
     }
 }
