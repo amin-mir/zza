@@ -27,11 +27,7 @@ impl Display for Sleep {
 
 impl Sleep {
     pub fn new(id: usize, until: Instant, waker: Waker) -> Self {
-        Self {
-            id,
-            until,
-            waker,
-        }
+        Self { id, until, waker }
     }
 }
 
@@ -95,7 +91,11 @@ mod tests {
             Sleep::new(1, now + Duration::from_millis(200), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(300), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(
+            2,
+            now + Duration::from_millis(300),
+            WAKER.clone(),
+        ));
         assert_eq!(i, 2);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -109,7 +109,11 @@ mod tests {
             Sleep::new(1, now + Duration::from_millis(300), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(200), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(
+            2,
+            now + Duration::from_millis(200),
+            WAKER.clone(),
+        ));
         assert_eq!(i, 1);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -123,7 +127,11 @@ mod tests {
             Sleep::new(1, now + Duration::from_millis(300), WAKER.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(100), WAKER.clone()));
+        let i = sleeps.add(Sleep::new(
+            2,
+            now + Duration::from_millis(100),
+            WAKER.clone(),
+        ));
         assert_eq!(i, 0);
         assert_eq!(sleeps.0.len(), 3);
     }

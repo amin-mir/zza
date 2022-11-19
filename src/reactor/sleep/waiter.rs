@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crossbeam::sync::Parker;
-use tracing::{debug};
+use tracing::debug;
 
 use super::{Sleep, Sleeps};
 
@@ -110,7 +110,7 @@ mod tests {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
             sleeps.add(Sleep::new(
-                0, 
+                0,
                 Instant::now() + Duration::from_millis(20),
                 test_waker.clone().waker(),
             ));

@@ -51,9 +51,9 @@ mod tests {
     use super::*;
 
     use crossbeam::channel::RecvTimeoutError;
-    use tracing::{trace_span, trace};
     use std::thread;
     use std::time::{Duration, Instant};
+    use tracing::{trace, trace_span};
 
     use crossbeam::channel::{self, Sender};
     use test_log::test;
