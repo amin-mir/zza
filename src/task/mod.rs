@@ -6,14 +6,15 @@ use crossbeam::channel::Sender;
 use futures::future::BoxFuture;
 use futures::task::{self, ArcWake};
 
-/// Should Task be run only on a single thread in which case
-/// it's LocalBoxFuture or be Send so it can be transmitted to
-/// different threads thus BoxFuture?
-///
 /// Task implements the Wake functionality. It's what connects
 /// the Reactor to Executor.
 pub struct Task {
-    // TODO: can we get rid of Mutex?
+    // TODO: Should Task be run only on a single thread in which case
+    // it's LocalBoxFuture or be Send so it can be transmitted to
+    // different threads thus BoxFuture?
+    // TODO: can we get rid of Mutex? what if instead of sending the Task
+    // through channel, we send the id of that Task. Executor will take
+    // exclusive ownership of Tasks. No Arc + Mutex needed anymore.
     // TODO: can we get rid of Box? probably yes, we can pin to stack
     // before polling. Future contract says it should not be moved after
     // it's been polled first time. Or we can add an Unpin restriction??
@@ -22,7 +23,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn spawn<F>(future: F, schedule_tx: Sender<Arc<Task>>) -> Arc<Task>
+    pub fn spawn<F>(future: F, schedule_tx: Sender<Arc<Task>>) -> Result<Arc<Task>, String>
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -31,10 +32,12 @@ impl Task {
             schedule_tx: schedule_tx.clone(),
         };
         let task = Arc::new(task);
-        // TODO: convert SendError to some custom error with `thiserr`.
-        // TODO: use tracing to log the channel is closed on the other side.
-        schedule_tx.send(task.clone()).unwrap();
-        task
+        
+        if let Err(_) = schedule_tx.send(task.clone()) {
+            return Err("channel for sending Task to Executor is closed".to_string());
+        }
+
+        Ok(task)
     }
 
     pub fn poll(self: Arc<Self>) {
@@ -54,7 +57,8 @@ impl ArcWake for Task {
 }
 
 /*
-Sample RawWaker implementation
+Sample `RawWaker` implementation:
+
 VTABLE implementation influenced by the following:
 https://docs.rs/crate/waker-fn/1.1.0/source/src/lib.rs
 https://docs.rs/futures-task/0.3.24/src/futures_task/waker.rs.html#19-21

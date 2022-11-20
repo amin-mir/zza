@@ -15,7 +15,7 @@ fn main() {
     let executor = Executor::new();
 
     executor.spawn(async {
-        println!("spawning the sleep future");
+        info!("spawning the sleep future");
         let now = Instant::now();
         let sleep_fut1 = sleep(Duration::from_secs(2));
         let sleep_fut2 = sleep(Duration::from_secs(1));

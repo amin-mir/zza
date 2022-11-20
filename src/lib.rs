@@ -8,10 +8,12 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-use std::{cell::RefCell, future::Future};
+use std::cell::RefCell;
+use std::future::Future;
 
 use crossbeam::channel::{self, Receiver, Sender};
 use lazy_static::lazy_static;
+use tracing::error;
 
 mod reactor;
 use reactor::sleep::Spawner;
@@ -27,20 +29,24 @@ lazy_static! {
 }
 
 // Because we need interior mutability in this case it's more
-// efficient to thread local storage. The reason why we need
+// efficient to use thread local storage. The reason why we need
 // interior mutability is that `EXECUTOR_TX` is not initialized
 // at first. It will only get initialized after `Executor::new`.
 thread_local! {
     static EXECUTOR_TX: RefCell<Option<Sender<Arc<Task>>>> = RefCell::new(None);
 }
 
+// TODO: return a handle that can be awaited for result.
+// In that case future's output cannot be () anymore.
 pub fn spawn<F: Future<Output = ()> + Send + 'static>(f: F) {
     EXECUTOR_TX.with(|cell| {
         let borrow = cell.borrow();
         let tx = borrow
             .as_ref()
             .expect("Executor should be initialized first");
-        Task::spawn(f, tx.clone());
+        if let Err(reason) = Task::spawn(f, tx.clone()) {
+            error!(reason, "spawning a new task failed");
+        }
     })
 }
 
@@ -63,9 +69,11 @@ impl Executor {
         Executor { tx, rx }
     }
 
-    // DEISGN THOUGHT: why should the future be Send + 'static.
+    // TODO: why should the future be Send + 'static??
     pub fn spawn<F: Future<Output = ()> + Send + 'static>(&self, f: F) {
-        Task::spawn(f, self.tx.clone());
+        if let Err(reason) = Task::spawn(f, self.tx.clone()) {
+            error!(reason, "spawning a new task failed");
+        }
     }
 
     pub fn run(&self) {
