@@ -2,14 +2,12 @@
 // 1. read and review the code and fix minor issues.
 // 2. enable normal program finish, so when the main future finished
 //    the program should exit.
-// 3. enable spawning several sleeps at the same time.
-// 4. using TLS and lazy_static! make it super easy to setup.
-// 5. figure out how to write an IO reactor.
+// 3. read what-the-async and figure out how to write an IO reactor.
 
+use std::future::Future;
+use std::cell::RefCell;
 use std::sync::Arc;
 use std::time::Duration;
-use std::cell::RefCell;
-use std::future::Future;
 
 use crossbeam::channel::{self, Receiver, Sender};
 use lazy_static::lazy_static;
@@ -45,7 +43,7 @@ pub fn spawn<F: Future<Output = ()> + Send + 'static>(f: F) {
             .as_ref()
             .expect("Executor should be initialized first");
         if let Err(reason) = Task::spawn(f, tx.clone()) {
-            error!(reason, "spawning a new task failed");
+            error!(%reason, "spawning a new task failed");
         }
     })
 }
@@ -72,7 +70,7 @@ impl Executor {
     // TODO: why should the future be Send + 'static??
     pub fn spawn<F: Future<Output = ()> + Send + 'static>(&self, f: F) {
         if let Err(reason) = Task::spawn(f, self.tx.clone()) {
-            error!(reason, "spawning a new task failed");
+            error!(%reason, "spawning a new task failed");
         }
     }
 
@@ -85,4 +83,21 @@ impl Executor {
 
 pub fn sleep(dur: Duration) -> impl Future<Output = ()> {
     SleepFuture::new(dur)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use std::future::Future;
+
+    pub struct ResolvedFuture;
+
+    impl Future for ResolvedFuture {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+            Poll::Ready(())
+        }
+    }
 }

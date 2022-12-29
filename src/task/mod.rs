@@ -1,3 +1,5 @@
+use std::error;
+use std::fmt;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::task::Context;
@@ -22,8 +24,17 @@ pub struct Task {
     schedule_tx: Sender<Arc<Task>>,
 }
 
+impl fmt::Debug for Task {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Task(..)")
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SpawnError;
+
 impl Task {
-    pub fn spawn<F>(future: F, schedule_tx: Sender<Arc<Task>>) -> Result<Arc<Task>, String>
+    pub fn spawn<F>(future: F, schedule_tx: Sender<Arc<Task>>) -> Result<Arc<Task>, SpawnError>
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -32,9 +43,9 @@ impl Task {
             schedule_tx: schedule_tx.clone(),
         };
         let task = Arc::new(task);
-        
+
         if let Err(_) = schedule_tx.send(task.clone()) {
-            return Err("channel for sending Task to Executor is closed".to_string());
+            return Err(SpawnError);
         }
 
         Ok(task)
@@ -53,6 +64,33 @@ impl Task {
 impl ArcWake for Task {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         arc_self.schedule_tx.send(Arc::clone(arc_self)).unwrap();
+    }
+}
+
+impl fmt::Display for SpawnError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "channel for receiving Tasks on Executor side is closed".fmt(f)
+    }
+}
+
+impl error::Error for SpawnError {}
+
+#[cfg(test)]
+mod tests {
+    use crossbeam::channel;
+
+    use super::*;
+    use crate::tests::ResolvedFuture;
+
+    #[test]
+    fn spawn_error() {
+        let (tx, rx) = channel::unbounded();
+
+        // Close the receiving side immediately.
+        drop(rx);
+
+        let err = Task::spawn(ResolvedFuture, tx).unwrap_err();
+        assert_eq!(err, SpawnError);
     }
 }
 
