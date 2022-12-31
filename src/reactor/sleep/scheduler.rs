@@ -1,9 +1,9 @@
-use std::fmt::Display;
 use std::error::Error;
+use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 
+use crossbeam::channel::{Receiver, Sender, TrySendError};
 use crossbeam::select;
-use crossbeam::channel::{ Sender, Receiver, TrySendError };
 use tracing::{debug, info};
 
 use super::{Sleep, Sleeps};
@@ -51,12 +51,11 @@ impl Scheduler {
                         break;
                     }
                 }
-                recv(self.done_rx) -> _ => {
-                    info!("received done signal");
-                    break;
-                }
+                recv(self.done_rx) -> _ => break,
             }
         }
+
+        debug!("scheduler loop finished, quitting the thread")
     }
 
     fn handle_sleep(&self, sleep: Sleep) -> Result<(), HandleSleepError> {
@@ -68,7 +67,7 @@ impl Scheduler {
         if i == 0 {
             debug!("received an earlier sleep, going to unpark.");
             match self.interrupt_tx.try_send(()) {
-                Err(TrySendError::Disconnected(_)) => Err(HandleSleepError), 
+                Err(TrySendError::Disconnected(_)) => Err(HandleSleepError),
 
                 // If channel was full or send was successful. interrupt_tx is a zero-capacity channel
                 // and the reason we still return Ok is that it indicates the other side is not ready
@@ -121,7 +120,7 @@ mod tests {
 
         // interrupt_rx will be unusable because in the middle of the test, done signal
         // is sent, after which scheduler shuts down and the Sender half is closed.
-        let (interrupt_tx, _interrupt_rx) = channel::bounded(0);
+        let (interrupt_tx, _interrupt_rx) = channel::bounded(1);
 
         // Setting channel capacity to 0, otherwise the send will be successful.
         // The point of this test is making sure the graceful shutdown works, meaning
@@ -151,7 +150,7 @@ mod tests {
             Instant::now() + Duration::from_millis(100),
             test_waker.clone().waker(),
         );
-        
+
         // Scheduler shouldn't accept anymore sleeps. Any attempts to send on
         // the sleep_tx should result in SendError which will only happen when
         // the receiving side has disconnected.
@@ -162,7 +161,7 @@ mod tests {
     #[test]
     fn should_not_interrupt() {
         let (done_tx, done_rx) = channel::bounded(0);
-        let (interrupt_tx, interrupt_rx) = channel::bounded(0);
+        let (interrupt_tx, interrupt_rx) = channel::bounded(1);
         let (sleep_tx, sleep_rx) = channel::unbounded();
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 
@@ -198,7 +197,7 @@ mod tests {
     #[test]
     fn should_interrupt() {
         let (done_tx, done_rx) = channel::bounded(0);
-        let (interrupt_tx, interrupt_rx) = channel::bounded(0);
+        let (interrupt_tx, interrupt_rx) = channel::bounded(1);
         let (sleep_tx, sleep_rx) = channel::unbounded();
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 
@@ -217,7 +216,7 @@ mod tests {
         let scheduler_thread = thread::spawn(move || {
             scheduler.run();
         });
-        
+
         sleep_tx
             .send(Sleep::new(
                 1,

@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use futures::future;
 use tracing::info;
 
-use zza::{sleep, Executor};
+use zza::{shutdown, sleep, Executor};
 
 fn main() {
     // the call to init at the end sets this to be the
@@ -12,7 +12,9 @@ fn main() {
         .with_max_level(tracing::Level::TRACE)
         .init();
 
-    let executor = Executor::new();
+    let done_rx = shutdown::notify();
+
+    let executor = Executor::new(done_rx);
 
     executor.spawn(async {
         info!("spawning the sleep future");

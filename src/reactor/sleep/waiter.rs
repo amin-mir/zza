@@ -17,7 +17,7 @@ pub struct Waiter {
     // to channel. The reason is that if Waiter is busy and haven't processed the
     // previous interrupt, we don't have to block the sender or keep sending more
     // interrupts. blocking the sender will reduce the sleep requests served by the
-    // reactor, and having several unprocessed interrupts in the channel means the 
+    // reactor, and having several unprocessed interrupts in the channel means the
     // Waiter will unnecessarily wake up (and lock/unlock) several times in a loop.
     interrupt_rx: Receiver<()>,
 
@@ -69,6 +69,7 @@ impl Waiter {
                 None => {
                     debug!("going to park indefinitely because empty sleep list.");
                     select! {
+                        // TODO: fix this! check if msg is success or error.
                         recv(self.interrupt_rx) -> _msg => (),
                         recv(self.done_rx) -> _msg => break,
                     }
@@ -92,7 +93,7 @@ impl Waiter {
                                 unfinished_sleep = Some(sleep);
                             }
                         }
-                        recv(self.done_rx) -> _msg => break, 
+                        recv(self.done_rx) -> _ => break,
                         default(sleep.until.duration_since(now)) => {
                             debug!(
                                 sleep_duration_ms = now.elapsed().as_millis(),
@@ -105,7 +106,7 @@ impl Waiter {
             }
         }
 
-        debug!("waiter loop finished")
+        debug!("waiter loop finished, quitting the thread")
     }
 }
 
@@ -123,7 +124,7 @@ mod tests {
 
     #[test]
     fn should_wake_after_deadline() {
-        let (interrupt_tx, interrupt_rx) = channel::bounded(1); 
+        let (interrupt_tx, interrupt_rx) = channel::bounded(1);
         let (done_tx, done_rx) = channel::bounded(0);
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 
@@ -156,7 +157,7 @@ mod tests {
     fn should_handle_expired_sleeps() {
         // Expired sleeps are the following:
         // Instant::now() > sleep.until
-        let (interrupt_tx, interrupt_rx) = channel::bounded(1); 
+        let (interrupt_tx, interrupt_rx) = channel::bounded(1);
         let (done_tx, done_rx) = channel::bounded(0);
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 

@@ -53,7 +53,10 @@ impl Future for SleepFuture {
         if !self.registered_with_reactor {
             let waker = cx.waker().clone();
             self.registered_with_reactor = true;
-            SLEEP_SPAWNER.spawn(self.id, until, waker);
+            let spawner = SLEEP_SPAWNER
+                .get()
+                .expect("sleep spawner is not initialized");
+            spawner.spawn(self.id, until, waker);
         } else {
             // TODO: how to update the waker previously registered
             // with the reactor. This will be necessary when futures

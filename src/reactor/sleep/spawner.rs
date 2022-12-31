@@ -7,7 +7,7 @@ use super::Sleep;
 
 /// Spawner provides a way to submit sleep tasks to the Reactor
 /// from the outside world.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Spawner {
     sleep_tx: Sender<Sleep>,
 }

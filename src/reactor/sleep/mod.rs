@@ -23,9 +23,14 @@ use waiter::Waiter;
 /// 2. `Scheduler` thread that schedules new sleeps and signals `Waiter`.
 /// 3. `Spawner` that is returned to caller for submitting new sleeps.
 // TODO: done channel should be passed from caller.
-pub fn run() -> Spawner {
-    let (_done_tx, done_rx) = channel::bounded(0);
-
+pub fn run(done_rx: Receiver<()>) -> Spawner {
+    // TODO: we don't actually need a done channel here. if we can just drop the Spawner
+    // then the sleep_tx will disconnect, thus attempting to receive on sleep_rx will result in
+    // RecvError which causes scheduler to quit. Scheduler first tries to process all the queued sleeps (unbounded channel)
+    // but that shouldn't take long as it just stores them to Sleeps. Scheduler getting dropped will in
+    // turn cause the interrupt_tx to disconnect and when that is detected by Waiter, it will quit the loop
+    // and shut down immediately (bounded cap=1), therefore we don't need a separate done channel. All we need is a way
+    // to drop Spawner.
     let (interrupt_tx, interrupt_rx) = channel::bounded(1);
 
     let (sleep_tx, sleep_rx) = channel::unbounded();
@@ -45,7 +50,7 @@ pub fn run() -> Spawner {
     });
 
     // TODO: should we combine the done channel with thread handles into spawner
-    // so that when it's dropped it closes the cone channel and then joins the threads.
+    // so that when it's dropped it closes the done channel and then joins the threads.
 
     spawner
 }
