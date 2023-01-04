@@ -17,7 +17,7 @@ pub fn notify() -> Receiver<()> {
 
     thread::spawn(move || {
         info!("received shutdown signal, going to notify");
-        let _ = ctrlc_rx.recv().unwrap();
+        ctrlc_rx.recv().unwrap();
         drop(notify_tx);
     });
 

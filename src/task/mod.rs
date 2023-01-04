@@ -30,7 +30,7 @@ impl fmt::Debug for Task {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SpawnError;
 
 impl Task {
@@ -44,7 +44,7 @@ impl Task {
         };
         let task = Arc::new(task);
 
-        if let Err(_) = schedule_tx.send(task.clone()) {
+        if schedule_tx.send(task.clone()).is_err() {
             return Err(SpawnError);
         }
 
