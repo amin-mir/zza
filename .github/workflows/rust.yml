@@ -11,32 +11,47 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     rust-version: [stable, beta, nightly]
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Update local toolchain
-      run: |
-        rustup update
-        rustup component add clippy
-        rustup install nightly          
+    # - name: Update local toolchain
+    #   run: |
+    #     rustup update
+    #     rustup component add clippy
+    #     rustup install nightly          
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        # override: true
+        components: rustfmt, clippy
+    
+    - name: Cache dependecies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Toolchain info
       run: |
         cargo --version --verbose
         rustc --version
         cargo clippy --version
-        
+
     - name: Lint
       run: |
         cargo fmt -- --check
-        cargo clippy -- -D warnings
+        cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Build
+      run: cargo build --verbose --release
         
     - name: Run tests
       run: cargo test --verbose    
-      
-    - name: Build
-      run: cargo build --verbose --release
-    
