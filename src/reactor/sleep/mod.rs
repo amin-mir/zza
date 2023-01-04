@@ -1,9 +1,9 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex};
 use std::task::Waker;
+use std::thread;
 use std::time::Instant;
 
 use crossbeam::channel::{self, Receiver};
@@ -180,11 +180,7 @@ mod tests {
             Sleep::new(1, now + Duration::from_millis(200), waker.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(
-            2,
-            now + Duration::from_millis(300),
-            waker,
-        ));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(300), waker));
         assert_eq!(i, 2);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -199,11 +195,7 @@ mod tests {
             Sleep::new(1, now + Duration::from_millis(300), waker.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(
-            2,
-            now + Duration::from_millis(200),
-            waker,
-        ));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(200), waker));
         assert_eq!(i, 1);
         assert_eq!(sleeps.0.len(), 3);
     }
@@ -212,17 +204,13 @@ mod tests {
     fn should_add_at_beginning() {
         let waker = TestWaker::new().waker();
         let now = Instant::now();
-       
+
         let mut sleeps = Sleeps(VecDeque::from([
             Sleep::new(0, now + Duration::from_millis(200), waker.clone()),
             Sleep::new(1, now + Duration::from_millis(300), waker.clone()),
         ]));
 
-        let i = sleeps.add(Sleep::new(
-            2,
-            now + Duration::from_millis(100),
-            waker,
-        ));
+        let i = sleeps.add(Sleep::new(2, now + Duration::from_millis(100), waker));
         assert_eq!(i, 0);
         assert_eq!(sleeps.0.len(), 3);
     }
