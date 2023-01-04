@@ -32,13 +32,11 @@ jobs:
         # override: true
         components: rustfmt, clippy
     
-    - name: Cache cargo registry
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        path: ~/.cargo/registry
-        key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-registry-
+        path: |
+          ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Toolchain info
       run: |
