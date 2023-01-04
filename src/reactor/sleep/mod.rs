@@ -41,7 +41,7 @@ pub fn run(done_rx: Receiver<()>) -> Spawner {
 
     let spawner = Spawner::new(sleep_tx);
     let mut scheduler = Scheduler::new(done_rx.clone(), interrupt_tx, sleep_rx, sleeps.clone());
-    let mut waiter = Waiter::new(interrupt_rx, done_rx.clone(), sleeps);
+    let mut waiter = Waiter::new(interrupt_rx, done_rx, sleeps);
 
     thread::spawn(move || {
         waiter.run();
@@ -183,7 +183,7 @@ mod tests {
         let i = sleeps.add(Sleep::new(
             2,
             now + Duration::from_millis(300),
-            waker.clone(),
+            waker,
         ));
         assert_eq!(i, 2);
         assert_eq!(sleeps.0.len(), 3);
@@ -202,7 +202,7 @@ mod tests {
         let i = sleeps.add(Sleep::new(
             2,
             now + Duration::from_millis(200),
-            waker.clone(),
+            waker,
         ));
         assert_eq!(i, 1);
         assert_eq!(sleeps.0.len(), 3);
@@ -221,7 +221,7 @@ mod tests {
         let i = sleeps.add(Sleep::new(
             2,
             now + Duration::from_millis(100),
-            waker.clone(),
+            waker,
         ));
         assert_eq!(i, 0);
         assert_eq!(sleeps.0.len(), 3);

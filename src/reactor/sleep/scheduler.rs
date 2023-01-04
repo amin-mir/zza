@@ -148,7 +148,7 @@ mod tests {
         let sleep = Sleep::new(
             1,
             Instant::now() + Duration::from_millis(100),
-            test_waker.clone().waker(),
+            test_waker.waker(),
         );
 
         // Scheduler shouldn't accept anymore sleeps. Any attempts to send on
@@ -184,7 +184,7 @@ mod tests {
             .send(Sleep::new(
                 1,
                 Instant::now() + Duration::from_millis(100),
-                test_waker.clone().waker(),
+                test_waker.waker(),
             ))
             .unwrap();
 
@@ -221,7 +221,7 @@ mod tests {
             .send(Sleep::new(
                 1,
                 Instant::now() + Duration::from_millis(20),
-                test_waker.clone().waker(),
+                test_waker.waker(),
             ))
             .unwrap();
 
