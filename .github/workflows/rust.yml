@@ -32,6 +32,7 @@ jobs:
         # override: true
         components: rustfmt, clippy
     
+    - name: Cache dependecies
       uses: actions/cache@v3
       with:
         path: |
