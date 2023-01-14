@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use crossbeam::channel::Receiver;
 use crossbeam::select;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use super::{Sleep, Sleeps};
 
@@ -67,7 +67,7 @@ impl Waiter {
             match sleep {
                 // Park the thread indefinitely when there are no sleeps to handle.
                 None => {
-                    debug!("going to park indefinitely because empty sleep list.");
+                    trace!("going to park indefinitely because empty sleep list.");
                     select! {
                         // TODO: fix this! check if msg is success or error.
                         recv(self.interrupt_rx) -> _msg => (),
@@ -75,7 +75,7 @@ impl Waiter {
                     }
                 }
                 Some(sleep) => {
-                    debug!(until = ?sleep.until, "waiter loop is going to park until sleep due time");
+                    trace!(until = ?sleep.until, "waiter loop is going to park until sleep due time");
 
                     let now = Instant::now();
                     if now >= sleep.until {
@@ -95,7 +95,7 @@ impl Waiter {
                         }
                         recv(self.done_rx) -> _ => break,
                         default(sleep.until.duration_since(now)) => {
-                            debug!(
+                            trace!(
                                 sleep_duration_ms = now.elapsed().as_millis(),
                                 "waking up the waker"
                             );
@@ -120,7 +120,7 @@ mod tests {
     use crossbeam::channel;
     use test_log::test;
 
-    use crate::reactor::sleep::tests::TestWaker;
+    use crate::SimpleWaker;
 
     #[test]
     fn should_wake_after_deadline() {
@@ -134,7 +134,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -167,7 +167,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -198,7 +198,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker1 = TestWaker::new();
+        let test_waker1 = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -214,7 +214,7 @@ mod tests {
         // gets picked up by Waiter.
         thread::sleep(Duration::from_millis(10));
 
-        let test_waker2 = TestWaker::new();
+        let test_waker2 = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();

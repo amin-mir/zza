@@ -30,13 +30,13 @@ mod tests {
     use crossbeam::channel;
 
     use super::*;
-    use crate::reactor::sleep::tests::TestWaker;
+    use crate::SimpleWaker;
 
     #[test]
     fn spawn_constructs_correct_sleep() {
         let (tx, rx) = channel::unbounded();
 
-        let waker: Waker = TestWaker::new().waker();
+        let waker: Waker = SimpleWaker::new().waker();
         let until = Instant::now() + Duration::from_millis(200);
 
         let spawner = Spawner::new(tx);

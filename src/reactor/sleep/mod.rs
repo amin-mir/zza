@@ -124,55 +124,15 @@ impl Sleeps {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::task::{Wake, Waker};
     use std::time::Duration;
 
-    use crossbeam::channel::{self, Receiver, Sender};
+    use crate::SimpleWaker;
 
     use super::*;
 
-    pub struct TestWaker {
-        woken: AtomicBool,
-        wake_tx: Sender<()>,
-        wake_rx: Receiver<()>,
-    }
-
-    impl TestWaker {
-        pub fn new() -> Arc<Self> {
-            let (tx, rx) = channel::bounded(1);
-            let waker = Self {
-                woken: AtomicBool::new(false),
-                wake_tx: tx,
-                wake_rx: rx,
-            };
-            Arc::new(waker)
-        }
-
-        pub fn waker(self: Arc<Self>) -> Waker {
-            Waker::from(self)
-        }
-
-        pub fn is_woken(self: &Arc<Self>) -> bool {
-            self.woken.load(Ordering::Relaxed)
-        }
-
-        pub fn wait_woken(self: &Arc<Self>) {
-            self.wake_rx.recv().unwrap();
-            assert!(self.is_woken())
-        }
-    }
-
-    impl Wake for TestWaker {
-        fn wake(self: Arc<Self>) {
-            self.woken.store(true, Ordering::Relaxed);
-            self.wake_tx.send(()).unwrap();
-        }
-    }
-
     #[test]
     fn should_add_at_end() {
-        let waker = TestWaker::new().waker();
+        let waker = SimpleWaker::new().waker();
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([
@@ -187,7 +147,7 @@ mod tests {
 
     #[test]
     fn should_add_at_middle() {
-        let waker = TestWaker::new().waker();
+        let waker = SimpleWaker::new().waker();
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([
@@ -202,7 +162,7 @@ mod tests {
 
     #[test]
     fn should_add_at_beginning() {
-        let waker = TestWaker::new().waker();
+        let waker = SimpleWaker::new().waker();
         let now = Instant::now();
 
         let mut sleeps = Sleeps(VecDeque::from([

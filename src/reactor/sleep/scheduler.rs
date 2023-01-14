@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam::channel::{Receiver, Sender, TrySendError};
 use crossbeam::select;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use super::{Sleep, Sleeps};
 
@@ -59,13 +59,13 @@ impl Scheduler {
     }
 
     fn handle_sleep(&self, sleep: Sleep) -> Result<(), HandleSleepError> {
-        debug!("going to acquire lock to send sleep to waiter.");
+        trace!("going to acquire lock to send sleep to waiter.");
         let mut sleeps = self.sleeps.lock().unwrap();
         let i = sleeps.add(sleep);
 
         // Handle the case where there's an earlier time we should wake up from sleep.
         if i == 0 {
-            debug!("received an earlier sleep, going to unpark.");
+            trace!("received an earlier sleep, going to unpark.");
             match self.interrupt_tx.try_send(()) {
                 Err(TrySendError::Disconnected(_)) => Err(HandleSleepError),
 
@@ -102,7 +102,7 @@ mod tests {
     use crossbeam::channel::{self, RecvTimeoutError};
     use test_log::test;
 
-    use crate::reactor::sleep::tests::TestWaker;
+    use crate::SimpleWaker;
 
     fn chan_not_received<T>(rx: Receiver<T>) -> Result<(), String> {
         match rx.recv_timeout(Duration::from_millis(50)) {
@@ -144,7 +144,7 @@ mod tests {
         // Wait until the done signal is received by scheduler.
         thread::sleep(Duration::from_millis(10));
 
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         let sleep = Sleep::new(
             1,
             Instant::now() + Duration::from_millis(100),
@@ -165,7 +165,7 @@ mod tests {
         let (sleep_tx, sleep_rx) = channel::unbounded();
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             let mut sleeps = sleeps.lock().unwrap();
             sleeps.add(Sleep::new(
@@ -201,7 +201,7 @@ mod tests {
         let (sleep_tx, sleep_rx) = channel::unbounded();
         let sleeps = Arc::new(Mutex::new(Sleeps::new()));
 
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             // lock is released at the end of block.
             let mut sleeps = sleeps.lock().unwrap();

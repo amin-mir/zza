@@ -1,71 +1,113 @@
 use std::error;
 use std::fmt;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::pin::Pin;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::task::Context;
+use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
 
+use crossbeam::channel;
+use crossbeam::channel::Receiver;
 use crossbeam::channel::Sender;
-use futures::future::BoxFuture;
-use futures::task::{self, ArcWake};
+use futures::channel::oneshot;
+use futures::future::FutureExt;
+use futures::task::ArcWake;
+use tracing::debug;
 
 /// Task implements the Wake functionality. It's what connects
 /// the Reactor to Executor.
+// TODO: can make Task not be Arc??
+// Maybe use RawWaker instead of ArcWake??
 pub struct Task {
-    // TODO: Should Task be run only on a single thread in which case
-    // it's LocalBoxFuture or be Send so it can be transmitted to
-    // different threads thus BoxFuture?
-    // TODO: can we get rid of Mutex? what if instead of sending the Task
-    // through channel, we send the id of that Task. Executor will take
-    // exclusive ownership of Tasks. No Arc + Mutex needed anymore.
-    // TODO: can we get rid of Box? probably yes, we can pin to stack
-    // before polling. Future contract says it should not be moved after
-    // it's been polled first time. Or we can add an Unpin restriction??
-    future: Mutex<BoxFuture<'static, ()>>,
-    schedule_tx: Sender<Arc<Task>>,
+    fut_id: usize,
+    schedule_tx: crossbeam::channel::Sender<Arc<Task>>,
 }
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Task(..)")
+        write!(f, "Task{{ fut_id = {} }}", self.fut_id)
+    }
+}
+
+impl Task {
+    pub fn future_id(&self) -> usize {
+        self.fut_id
+    }
+
+    pub fn spawn<O>(
+        fut_id: usize,
+        schedule_tx: crossbeam::channel::Sender<Arc<Task>>,
+        output_rx: oneshot::Receiver<O>,
+    ) -> Result<Handle<O>, SpawnError> {
+        let handle = Handle::new(output_rx);
+
+        let task = Task {
+            fut_id,
+            schedule_tx: schedule_tx.clone(),
+        };
+        let task = Arc::new(task);
+
+        if schedule_tx.send(task).is_err() {
+            return Err(SpawnError);
+        }
+
+        Ok(handle)
+    }
+}
+
+impl ArcWake for Task {
+    fn wake_by_ref(arc_self: &Arc<Self>) {
+        debug!(fut_id = arc_self.fut_id, "calling wake_by_ref on Task");
+        arc_self.schedule_tx.send(Arc::clone(arc_self)).unwrap();
+    }
+}
+
+pub struct SimpleWaker {
+    woken: AtomicBool,
+    wake_tx: Sender<()>,
+    wake_rx: Receiver<()>,
+}
+
+impl SimpleWaker {
+    pub fn new() -> Arc<Self> {
+        let (tx, rx) = channel::bounded(1);
+        let waker = Self {
+            woken: AtomicBool::new(false),
+            wake_tx: tx,
+            wake_rx: rx,
+        };
+        Arc::new(waker)
+    }
+
+    pub fn waker(self: Arc<Self>) -> Waker {
+        Waker::from(self)
+    }
+
+    pub fn is_woken(self: &Arc<Self>) -> bool {
+        self.woken.load(Ordering::Relaxed)
+    }
+
+    pub fn wait_woken(self: &Arc<Self>) {
+        self.wake_rx.recv().unwrap();
+        assert!(self.is_woken())
+    }
+}
+
+impl Wake for SimpleWaker {
+    fn wake(self: Arc<Self>) {
+        self.woken.store(true, Ordering::Relaxed);
+        self.wake_tx.send(()).unwrap();
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SpawnError;
 
-impl Task {
-    pub fn spawn<F>(future: F, schedule_tx: Sender<Arc<Task>>) -> Result<Arc<Task>, SpawnError>
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        let task = Task {
-            future: Mutex::new(Box::pin(future)),
-            schedule_tx: schedule_tx.clone(),
-        };
-        let task = Arc::new(task);
-
-        if schedule_tx.send(task.clone()).is_err() {
-            return Err(SpawnError);
-        }
-
-        Ok(task)
-    }
-
-    pub fn poll(self: Arc<Self>) {
-        let mut future = self.future.lock().unwrap();
-
-        let waker = task::waker_ref(&self);
-        let mut cx = Context::from_waker(&waker);
-
-        let _ = future.as_mut().poll(&mut cx);
-    }
-}
-
-impl ArcWake for Task {
-    fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.schedule_tx.send(Arc::clone(arc_self)).unwrap();
-    }
-}
+impl error::Error for SpawnError {}
 
 impl fmt::Display for SpawnError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -73,24 +115,54 @@ impl fmt::Display for SpawnError {
     }
 }
 
-impl error::Error for SpawnError {}
+#[derive(Debug)]
+pub struct Handle<O> {
+    output_rx: oneshot::Receiver<O>,
+}
+
+impl<O> Handle<O> {
+    fn new(output_rx: oneshot::Receiver<O>) -> Self {
+        Handle { output_rx }
+    }
+}
+
+impl<O> Future for Handle<O> {
+    type Output = O;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Receiver resolves to Result<T, Canceled> and we unwrap the result here.
+        self.output_rx.poll_unpin(cx).map(Result::unwrap)
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use crossbeam::channel;
-
     use super::*;
-    use crate::tests::ResolvedFuture;
 
     #[test]
     fn spawn_error() {
-        let (tx, rx) = channel::unbounded();
+        let (schedule_tx, schedule_rx) = crossbeam::channel::bounded(1);
+        let (_output_tx, output_rx) = oneshot::channel::<()>();
 
         // Close the receiving side immediately.
-        drop(rx);
+        drop(schedule_rx);
 
-        let err = Task::spawn(ResolvedFuture, tx).unwrap_err();
+        let err = Task::spawn(10, schedule_tx, output_rx).unwrap_err();
         assert_eq!(err, SpawnError);
+    }
+
+    #[test]
+    fn spawn_handle_resolves_correctly() {
+        // We're testing at the same time that the Handle implements
+        // Future trait correctly.
+        let (schedule_tx, _schedule_rx) = crossbeam::channel::bounded(1);
+
+        let (output_tx, output_rx) = oneshot::channel();
+        output_tx.send("some data".to_owned()).unwrap();
+
+        let handle = Task::spawn(326, schedule_tx, output_rx).unwrap();
+        let o = crate::block_on(handle);
+        assert_eq!("some data", o);
     }
 }
 

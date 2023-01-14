@@ -16,8 +16,8 @@ pub fn notify() -> Receiver<()> {
     .expect("Error setting Ctrl-C handler");
 
     thread::spawn(move || {
-        info!("received shutdown signal, going to notify");
         ctrlc_rx.recv().unwrap();
+        info!("received shutdown signal, going to notify");
         drop(notify_tx);
     });
 
