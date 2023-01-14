@@ -16,7 +16,7 @@ use crossbeam::channel::Sender;
 use futures::channel::oneshot;
 use futures::future::FutureExt;
 use futures::task::ArcWake;
-use tracing::info;
+use tracing::debug;
 
 /// Task implements the Wake functionality. It's what connects
 /// the Reactor to Executor.
@@ -61,7 +61,7 @@ impl Task {
 
 impl ArcWake for Task {
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        info!(fut_id = arc_self.fut_id, "calling wake_by_ref on Task");
+        debug!(fut_id = arc_self.fut_id, "calling wake_by_ref on Task");
         arc_self.schedule_tx.send(Arc::clone(arc_self)).unwrap();
     }
 }

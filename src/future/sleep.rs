@@ -44,7 +44,7 @@ impl Future for SleepFuture {
         let now = Instant::now();
         let until = self.until;
 
-        debug!(sleep_id = self.id, ?until, ?now, "future is being polled");
+        debug!(sleep_id = self.id, ?until, ?now, "sleep is being polled");
         if until <= now {
             debug!(id = self.id, ?until, "future is resolved");
             return Poll::Ready(());

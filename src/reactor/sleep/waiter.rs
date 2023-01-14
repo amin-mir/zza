@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use crossbeam::channel::Receiver;
 use crossbeam::select;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use super::{Sleep, Sleeps};
 
@@ -67,7 +67,7 @@ impl Waiter {
             match sleep {
                 // Park the thread indefinitely when there are no sleeps to handle.
                 None => {
-                    debug!("going to park indefinitely because empty sleep list.");
+                    trace!("going to park indefinitely because empty sleep list.");
                     select! {
                         // TODO: fix this! check if msg is success or error.
                         recv(self.interrupt_rx) -> _msg => (),
@@ -75,7 +75,7 @@ impl Waiter {
                     }
                 }
                 Some(sleep) => {
-                    debug!(until = ?sleep.until, "waiter loop is going to park until sleep due time");
+                    trace!(until = ?sleep.until, "waiter loop is going to park until sleep due time");
 
                     let now = Instant::now();
                     if now >= sleep.until {
@@ -95,7 +95,7 @@ impl Waiter {
                         }
                         recv(self.done_rx) -> _ => break,
                         default(sleep.until.duration_since(now)) => {
-                            debug!(
+                            trace!(
                                 sleep_duration_ms = now.elapsed().as_millis(),
                                 "waking up the waker"
                             );

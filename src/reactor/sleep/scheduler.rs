@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam::channel::{Receiver, Sender, TrySendError};
 use crossbeam::select;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use super::{Sleep, Sleeps};
 
@@ -59,13 +59,13 @@ impl Scheduler {
     }
 
     fn handle_sleep(&self, sleep: Sleep) -> Result<(), HandleSleepError> {
-        debug!("going to acquire lock to send sleep to waiter.");
+        trace!("going to acquire lock to send sleep to waiter.");
         let mut sleeps = self.sleeps.lock().unwrap();
         let i = sleeps.add(sleep);
 
         // Handle the case where there's an earlier time we should wake up from sleep.
         if i == 0 {
-            debug!("received an earlier sleep, going to unpark.");
+            trace!("received an earlier sleep, going to unpark.");
             match self.interrupt_tx.try_send(()) {
                 Err(TrySendError::Disconnected(_)) => Err(HandleSleepError),
 
