@@ -167,7 +167,7 @@ impl Executor {
                         futures.remove(&task.future_id());
                         debug!(fut_id = task.future_id(), remaining_futures = futures.len(), "a future completed execution");
 
-                        if futures.len() == 0 {
+                        if futures.is_empty() {
                             info!("all futures completed, quitting executor loop");
                             break;
                         }

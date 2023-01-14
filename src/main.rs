@@ -30,7 +30,7 @@ fn main() {
 
         let handle = zza::spawn(async {
             sleep(Duration::from_millis(500)).await;
-            return 5;
+            5
         });
         info!("nested spawn result: {}", handle.await);
 
