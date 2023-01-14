@@ -120,7 +120,7 @@ mod tests {
     use crossbeam::channel;
     use test_log::test;
 
-    use crate::reactor::sleep::tests::TestWaker;
+    use crate::SimpleWaker;
 
     #[test]
     fn should_wake_after_deadline() {
@@ -134,7 +134,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -167,7 +167,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker = TestWaker::new();
+        let test_waker = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -198,7 +198,7 @@ mod tests {
         });
 
         // Add a sleep request to the shared Sleeps and interrupt.
-        let test_waker1 = TestWaker::new();
+        let test_waker1 = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();
@@ -214,7 +214,7 @@ mod tests {
         // gets picked up by Waiter.
         thread::sleep(Duration::from_millis(10));
 
-        let test_waker2 = TestWaker::new();
+        let test_waker2 = SimpleWaker::new();
         {
             // The lock is released at the end of the block.
             let mut sleeps = sleeps.lock().unwrap();

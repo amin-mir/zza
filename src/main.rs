@@ -27,6 +27,11 @@ fn main() {
         // are woken.
         future::join(sleep_fut1, sleep_fut2).await;
 
+        // let fut = zza::spawn(async {
+        //     sleep(Duration::from_secs(1)).await;
+        // });
+        // fut.await;
+
         sleep(Duration::from_secs(1)).await;
         info!(dur_ms = now.elapsed().as_millis(), "sleep ended");
     });
