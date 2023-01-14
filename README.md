@@ -2,14 +2,12 @@
 Zan, Zendegi, Azadi. Named in honor of brave women of Iran! It means "women, life and freedom". `zza` is a Rust async runtime for educational purposes only!
 
 ## TODO
-* Enable github actions to run tests.
-* Enable normal program finish, so when the main future finishes
-  the program should exit.
 * move the creation of done, interrupt, and sleep channels to a single place
   in sleep reactor so all tests create those channels the same way.
 * read what-the-async and other async-related articles to get inspiration for IO reactor.
 
 ## Features
+* Enable github actions to run tests.
 * Graceful shutdown.
 * Program finishes gracefully when all the Futures are complete.
 
